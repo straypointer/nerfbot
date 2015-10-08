@@ -13,6 +13,7 @@ namespace NerfBot {
 		public int Port { get; set; }
 		public string Nick { get; set; }
 		public string Channel { get; set; }
+		public string Master { get; set; }
 	}
 	
 	public class Bot {
@@ -47,17 +48,19 @@ namespace NerfBot {
 				foreach (string c in commands) {
 					cmd = c.Trim();
 
-					System.Console.WriteLine(cmd);
+					this.ConsoleLog(cmd);
 
 					parameters = cmd.Split(new char[] { ' ' }, 4);
 
 					if (parameters[0] == "PING") {
 						this.SendIrcCommandNoWait(string.Format("PONG {0}", parameters[1]));
 					} else if (parameters.Length > 1) {
-						run = this.HandleIrcCommand(parameters);
+						try {
+							run = this.HandleIrcCommand(parameters);
+						} catch (Exception e) {
+							this.ConsoleLog(e.Message);
+						}
 					}
-
-
 				}
 
 				// do we have tasks to take care of?  nerf war?
@@ -68,6 +71,10 @@ namespace NerfBot {
 
 			this.CloseSocket();
 
+		}
+
+		protected void ConsoleLog(string msg) {
+			System.Console.WriteLine(msg);
 		}
 
 		protected bool HandleIrcCommand(string[] parameters) {
@@ -81,9 +88,25 @@ namespace NerfBot {
 						return this.RecvPrivateMessage(parameters[0], parameters[3]);
 					}
 					break;
+				case "JOIN":
+					// if master joined the channel, grant him ops (if we have it)
+					if (parameters[0] == _config.Master) {
+						string nick = this.GetNickFromIdent(parameters[0]);
+						string ops = string.Format("MODE {0} +o {1}", _config.Channel, nick);
+						this.SendIrcCommandNoWait(ops);
+					}
+					break;
 			}
 
 			return true;
+		}
+
+		protected string GetNickFromIdent(string ident) {
+			string[] parts = ident.Split('!');
+			if (parts.Length < 2) {
+				throw new Exception(string.Format("ident string cannot be parsed: {0}", ident));
+			}
+			return parts[0].Substring(1);
 		}
 
 		protected void RecvChannelMessage(string sender, string msg) {
@@ -124,11 +147,11 @@ namespace NerfBot {
 			try {
 				_socket.Connect(remoteEP);
 
-				Console.WriteLine("Socket connected to {0}", _socket.RemoteEndPoint.ToString());
+				this.ConsoleLog(string.Format("Socket connected to {0}", _socket.RemoteEndPoint.ToString()));
 
 			} catch (Exception ex) {
 
-				Console.WriteLine("EXCEPTION: ", ex.Message);
+				this.ConsoleLog(string.Format("EXCEPTION: ", ex.Message));
 				return null;
 			}
 
@@ -149,11 +172,10 @@ namespace NerfBot {
 		}
 
 		protected int SendIrcCommandNoWait(string cmd) {
-		//	byte[] buffer = new byte[1024];
 			int bytes = _socket.Send(this.GetBytes(cmd + "\r\n"));
 
 			// if debug
-			System.Console.WriteLine("SENT: {0}", cmd);
+			this.ConsoleLog(string.Format("SENT: {0}", cmd));
 
 			return bytes;
 		}

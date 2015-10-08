@@ -13,7 +13,8 @@ namespace NerfBot {
 				Host = ConfigurationManager.AppSettings["host"],
 				Nick = ConfigurationManager.AppSettings["nick"],
 				Port = Convert.ToInt32(ConfigurationManager.AppSettings["port"]),
-				Channel = ConfigurationManager.AppSettings["channel"]
+				Channel = ConfigurationManager.AppSettings["channel"],
+				Master = ConfigurationManager.AppSettings["master"]
 			};
 
 			var bot = new Bot(config);
