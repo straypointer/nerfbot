@@ -38,29 +38,36 @@ namespace NerfBot {
 
 			// do stuff
 			string[] commands = null;
-			string[] parameters = null;
+			//string[] parameters = null;
 			string cmd;
 			bool run = true;
 
 			while (run) {
 				commands = this.ReadIrcResponse();
-
+                IRCMessage currentMessage;
 				foreach (string c in commands) {
-					cmd = c.Trim();
+                    if (!string.IsNullOrWhiteSpace(c))
+                    {
+                        currentMessage = new IRCMessage(c);
 
-					this.ConsoleLog(cmd);
+                        this.ConsoleLog(c);
 
-					parameters = cmd.Split(new char[] { ' ' }, 4);
-
-					if (parameters[0] == "PING") {
-						this.SendIrcCommandNoWait(string.Format("PONG {0}", parameters[1]));
-					} else if (parameters.Length > 1) {
-						try {
-							run = this.HandleIrcCommand(parameters);
-						} catch (Exception e) {
-							this.ConsoleLog(e.Message);
-						}
-					}
+                        if (currentMessage.Command == "PING")
+                        {
+                            this.SendIrcCommandNoWait(string.Format("PONG {0}", currentMessage.Parameters[0]));
+                        }
+                        else if (currentMessage.Parameters.Any())
+                        {
+                            try
+                            {
+                                run = this.HandleIrcCommand(currentMessage);
+                            }
+                            catch (Exception e)
+                            {
+                                this.ConsoleLog(e.Message);
+                            }
+                        }
+                    }
 				}
 
 				// do we have tasks to take care of?  nerf war?
@@ -77,21 +84,20 @@ namespace NerfBot {
 			System.Console.WriteLine(msg);
 		}
 
-		protected bool HandleIrcCommand(string[] parameters) {
-			string cmd = parameters[1];
+		protected bool HandleIrcCommand(IRCMessage message) {
 
-			switch (cmd) {
+			switch (message.Command) {
 				case "PRIVMSG":
-					if (parameters[2] == _config.Channel) {
-						this.RecvChannelMessage(parameters[0], parameters[3]);
-					} else if (parameters[2] == _config.Nick) {
-						return this.RecvPrivateMessage(parameters[0], parameters[3]);
+					if (message.Parameters[0] == _config.Channel) {
+						this.RecvChannelMessage(message.Prefix, message.Parameters[1]);
+					} else if (message.Parameters[0] == _config.Nick) {
+						return this.RecvPrivateMessage(message.Prefix, message.Parameters[1]);
 					}
 					break;
 				case "JOIN":
 					// if master joined the channel, grant him ops (if we have it)
-					if (parameters[0] == _config.Master) {
-						string nick = this.GetNickFromIdent(parameters[0]);
+					if (message.Prefix == _config.Master) {
+						string nick = this.GetNickFromIdent(message.Prefix);
 						string ops = string.Format("MODE {0} +o {1}", _config.Channel, nick);
 						this.SendIrcCommandNoWait(ops);
 					}
